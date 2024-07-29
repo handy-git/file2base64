@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 文件转换工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="file"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group textarea {
+            resize: vertical;
+        }
+        .form-group button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Excel 文件转换工具</h1>
+    <div class="container">
+        <div class="form-group">
+            <label for="fileInput">上传 Excel 文件：</label>
+            <input type="file" id="fileInput" />
+        </div>
+        <div class="form-group">
+            <label for="sheetSelect">选择工作表：</label>
+            <select id="sheetSelect">
+                <option value="">请选择工作表</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <button onclick="convertExcelToBase64()">转换为 Base64</button>
+        </div>
+        <div class="form-group">
+            <label for="base64Output">Base64 编码数据：</label>
+            <textarea id="base64Output" rows="10" placeholder="Base64 编码数据将显示在这里"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="base64Input">粘贴 Base64 数据：</label>
+            <textarea id="base64Input" rows="10" placeholder="在这里粘贴 Base64 编码的数据"></textarea>
+            <button onclick="convertBase64ToExcel()">转换为 Excel 文件</button>
+        </div>
+    </div>
+
+    <script>
+        var workbook;
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (!file) {
+                alert('请上传一个 Excel 文件');
+                return;
+            }
+
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                var data = new Uint8Array(event.target.result);
+                workbook = XLSX.read(data, {type: 'array'});
+
+                var sheetSelect = document.getElementById('sheetSelect');
+                sheetSelect.innerHTML = '<option value="">请选择工作表</option>';
+
+                workbook.SheetNames.forEach(function(sheetName, index) {
+                    var option = document.createElement('option');
+                    option.value = sheetName;
+                    option.textContent = sheetName;
+                    sheetSelect.appendChild(option);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function convertExcelToBase64() {
+            var sheetName = document.getElementById('sheetSelect').value;
+            if (!sheetName) {
+                alert('请选择一个工作表');
+                return;
+            }
+
+            if (!workbook) {
+                alert('请先上传一个 Excel 文件');
+                return;
+            }
+
+            var sheet = workbook.Sheets[sheetName];
+            var wbout = XLSX.write({SheetNames: [sheetName], Sheets: { [sheetName]: sheet }}, {bookType: 'xlsx', type: 'binary'});
+            
+            function s2ab(s) {
+                var buf = new ArrayBuffer(s.length);
+                var view = new Uint8Array(buf);
+                for (var i = 0; i < s.length; i++) {
+                    view[i] = s.charCodeAt(i) & 0xFF;
+                }
+                return buf;
+            }
+            
+            var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(s2ab(wbout))));
+            document.getElementById('base64Output').value = base64;
+        }
+
+        function convertBase64ToExcel() {
+            var base64 = document.getElementById('base64Input').value.trim();
+            if (!base64) {
+                alert('请输入 Base64 编码数据');
+                return;
+            }
+            
+            var binaryString = window.atob(base64);
+            var binaryLen = binaryString.length;
+            var bytes = new Uint8Array(binaryLen);
+            for (var i = 0; i < binaryLen; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            var workbook = XLSX.read(new Uint8Array(bytes), {type: 'array'});
+            var wbout = XLSX.write(workbook, {bookType: 'xlsx', type: 'binary'});
+            
+            function s2ab(s) {
+                var buf = new ArrayBuffer(s.length);
+                var view = new Uint8Array(buf);
+                for (var i = 0; i < s.length; i++) {
+                    view[i] = s.charCodeAt(i) & 0xFF;
+                }
+                return buf;
+            }
+            
+            var blob = new Blob([s2ab(wbout)], {type: "application/octet-stream"});
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'output.xlsx';
+            link.click();
+        }
+    </script>
+</body>
+</html>
